@@ -9,9 +9,8 @@ def main():
         default="localhost",
         help="Hostname to connect to (default: localhost)",
     )
-    parser.add_argument(
-        "--port", required=True, type=int, help="Port number to connect to"
-    )
+    parser.add_argument("--port", type=int, help="Port number to connect to")
+    parser.add_argument("--path", type=str, help="Path to socket")
     parser.add_argument(
         "--interval", type=int, default=5, help="Monitor interval in seconds"
     )
@@ -20,6 +19,12 @@ def main():
 
     host = args.host
     port = args.port
+    path = args.path
     interval = args.interval
 
-    monitor(host, port, interval)
+    if path is not None:
+        connect_params = ("socket", path)
+    else:
+        connect_params = ("tcp", host, port)
+
+    monitor(connect_params, interval)

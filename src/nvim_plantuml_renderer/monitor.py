@@ -43,8 +43,15 @@ class RenderState:
             con.print(self.image)
 
 
-def monitor(host: str, port: int, interval: int):
-    nvim = pynvim.attach("tcp", address=host, port=port)
+type ConnectParams = tuple[Literal["tcp"], str, int] | tuple[Literal["socket"], str]
+
+
+def monitor(connect_params: ConnectParams, interval: int):
+    match connect_params:
+        case ("tcp", host, port):
+            nvim = pynvim.attach("tcp", address=host, port=port)
+        case ("socket", path):
+            nvim = pynvim.attach("socket", path=path)
 
     wait_poll_nvim(nvim, interval)
 
