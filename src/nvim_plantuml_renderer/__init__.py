@@ -9,8 +9,11 @@ def main():
         default="localhost",
         help="Hostname to connect to (default: localhost)",
     )
-    parser.add_argument("--port", type=int, help="Port number to connect to")
-    parser.add_argument("--path", type=str, help="Path to socket")
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--port", type=int, help="Port number to connect to")
+    group.add_argument("--path", type=str, help="Path to socket")
+
     parser.add_argument(
         "--interval", type=int, default=5, help="Monitor interval in seconds"
     )
