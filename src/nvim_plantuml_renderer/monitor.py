@@ -14,18 +14,14 @@ type Render = tuple[Literal["error"], str] | tuple[Literal["image"], ConsoleRend
 
 class RenderState:
     def __init__(self):
-        self.status: str = "not render yet"
+        self.status: str = "not rendered yet"
         self.image: ConsoleRenderable | None = None
 
     def handle_render(self, result: Render):
-        outcome = result[0]
-        if outcome == "error":
-            error = result[1]
-            if type(error) is str:
+        match result:
+            case ("error", error):
                 self.status = error
-        elif outcome == "image":
-            image = result[1]
-            if isinstance(image, ConsoleRenderable):
+            case ("image", image):
                 self.status = ""
                 self.image = image
 
