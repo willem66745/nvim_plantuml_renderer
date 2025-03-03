@@ -42,56 +42,6 @@ class RenderState:
 type ConnectParams = tuple[Literal["tcp"], str, int] | tuple[Literal["socket"], str]
 
 
-def monitor(plantuml: str, connect_params: ConnectParams, interval: int):
-    match connect_params:
-        case ("tcp", host, port):
-            nvim = pynvim.attach("tcp", address=host, port=port)
-        case ("socket", path):
-            nvim = pynvim.attach("socket", path=path)
-
-    wait_poll_nvim(plantuml, nvim, interval)
-
-
-def wait_poll_nvim(plantuml: str, nvim: pynvim.Nvim, interval: int):
-    state = RenderState()
-    con = Console()
-    con.clear()
-    while True:
-        sleep_time = poll_nvim(plantuml, nvim, con, state, interval)
-        sleep(sleep_time)
-
-
-def poll_nvim(
-    plantuml: str, nvim: pynvim.Nvim, con: Console, state: RenderState, interval: int
-) -> float:
-    name = nvim.current.window.buffer.name
-
-    before = datetime.now()
-
-    r = None
-
-    if name.endswith(".plantuml"):
-        r = render(plantuml, nvim.current.window.buffer[:])
-    elif name.endswith(".md"):
-        content = isolate_plantuml(nvim.current.window)
-        if content:
-            r = render(plantuml, content)
-
-    if r is not None:
-        state.handle_render(r)
-    else:
-        state.handle_no_render()
-
-    state.render(con)
-
-    duration = datetime.now() - before
-
-    new_timeout = timedelta(seconds=interval) - duration
-    as_float = new_timeout.total_seconds()
-
-    return max(0.0, as_float)
-
-
 def isolate_plantuml(win: Window) -> list[str]:
     """
     search in a nvim window from the cursor position to markdown code fragment
@@ -130,19 +80,80 @@ def isolate_plantuml(win: Window) -> list[str]:
     return []
 
 
-def render(plantuml: str, lines: list[str]) -> Render:
-    (out, err) = call_plantuml(plantuml, lines)
-    if len(err) > 0:
-        return ("error", err.decode("utf-8"))
-    elif len(out) > 0:
-        pil = pil_open(BytesIO(out))
-        con = ConImage(pil)
-        return ("image", con)
-    else:
-        return ("error", "plantuml didn't return anything")
+class MonitorConfig:
+    def __init__(self, executable: str, connect_params: ConnectParams, interval: int):
+        self.executable = executable
+        self.connect_params = connect_params
+        self.interval = interval
 
 
-def call_plantuml(plantuml: str, lines: list[str]) -> tuple[bytes, bytes]:
-    content = "\n".join(lines).encode("utf-8")
-    p = Popen([plantuml, "-tpng", "-p"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    return p.communicate(input=content)
+class Monitor:
+    def __init__(self, config: MonitorConfig):
+        self.config = config
+        self.state = RenderState()
+
+    def monitor(self):
+        match self.config.connect_params:
+            case ("tcp", host, port):
+                nvim = pynvim.attach("tcp", address=host, port=port)
+            case ("socket", path):
+                nvim = pynvim.attach("socket", path=path)
+
+        self.nvim = nvim
+        self._wait_poll_nvim()
+
+    def _wait_poll_nvim(self):
+        self.con = Console()
+        self.con.clear()
+        while True:
+            sleep_time = self._poll_nvim()
+            sleep(sleep_time)
+
+    def _poll_nvim(self) -> float:
+        name = self.nvim.current.window.buffer.name
+
+        before = datetime.now()
+
+        r = None
+
+        if name.endswith(".plantuml"):
+            r = self._render(self.nvim.current.window.buffer[:])
+        elif name.endswith(".md"):
+            content = isolate_plantuml(self.nvim.current.window)
+            if content:
+                r = self._render(content)
+
+        if r is not None:
+            self.state.handle_render(r)
+        else:
+            self.state.handle_no_render()
+
+        self.state.render(self.con)
+
+        duration = datetime.now() - before
+
+        new_timeout = timedelta(seconds=self.config.interval) - duration
+        as_float = new_timeout.total_seconds()
+
+        return max(0.0, as_float)
+
+    def _render(self, lines: list[str]) -> Render:
+        (out, err) = self._call_plantuml(lines)
+        if len(err) > 0:
+            return ("error", err.decode("utf-8"))
+        elif len(out) > 0:
+            pil = pil_open(BytesIO(out))
+            con = ConImage(pil)
+            return ("image", con)
+        else:
+            return ("error", "plantuml didn't return anything")
+
+    def _call_plantuml(self, lines: list[str]) -> tuple[bytes, bytes]:
+        content = "\n".join(lines).encode("utf-8")
+        p = Popen(
+            [self.config.executable, "-tpng", "-p"],
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        return p.communicate(input=content)

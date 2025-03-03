@@ -1,6 +1,6 @@
 import argparse
 import shutil
-from .monitor import monitor
+from .monitor import Monitor, MonitorConfig
 from subprocess import Popen, PIPE
 
 
@@ -51,4 +51,7 @@ def main():
     else:
         connect_params = ("tcp", host, port)
 
-    monitor(plantuml, connect_params, interval)
+    config = MonitorConfig(plantuml, connect_params, interval)
+    monitor = Monitor(config)
+
+    monitor.monitor()
