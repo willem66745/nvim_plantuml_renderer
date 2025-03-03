@@ -42,27 +42,27 @@ class RenderState:
 type ConnectParams = tuple[Literal["tcp"], str, int] | tuple[Literal["socket"], str]
 
 
-def monitor(connect_params: ConnectParams, interval: int):
+def monitor(plantuml: str, connect_params: ConnectParams, interval: int):
     match connect_params:
         case ("tcp", host, port):
             nvim = pynvim.attach("tcp", address=host, port=port)
         case ("socket", path):
             nvim = pynvim.attach("socket", path=path)
 
-    wait_poll_nvim(nvim, interval)
+    wait_poll_nvim(plantuml, nvim, interval)
 
 
-def wait_poll_nvim(nvim: pynvim.Nvim, interval: int):
+def wait_poll_nvim(plantuml: str, nvim: pynvim.Nvim, interval: int):
     state = RenderState()
     con = Console()
     con.clear()
     while True:
-        sleep_time = poll_nvim(nvim, con, state, interval)
+        sleep_time = poll_nvim(plantuml, nvim, con, state, interval)
         sleep(sleep_time)
 
 
 def poll_nvim(
-    nvim: pynvim.Nvim, con: Console, state: RenderState, interval: int
+    plantuml: str, nvim: pynvim.Nvim, con: Console, state: RenderState, interval: int
 ) -> float:
     name = nvim.current.window.buffer.name
 
@@ -71,11 +71,11 @@ def poll_nvim(
     r = None
 
     if name.endswith(".plantuml"):
-        r = render(nvim.current.window.buffer[:])
+        r = render(plantuml, nvim.current.window.buffer[:])
     elif name.endswith(".md"):
         content = isolate_plantuml(nvim.current.window)
         if content:
-            r = render(content)
+            r = render(plantuml, content)
 
     if r is not None:
         state.handle_render(r)
@@ -130,8 +130,8 @@ def isolate_plantuml(win: Window) -> list[str]:
     return []
 
 
-def render(lines: list[str]) -> Render:
-    (out, err) = call_plantuml(lines)
+def render(plantuml: str, lines: list[str]) -> Render:
+    (out, err) = call_plantuml(plantuml, lines)
     if len(err) > 0:
         return ("error", err.decode("utf-8"))
     elif len(out) > 0:
@@ -142,7 +142,7 @@ def render(lines: list[str]) -> Render:
         return ("error", "plantuml didn't return anything")
 
 
-def call_plantuml(lines: list[str]) -> tuple[bytes, bytes]:
+def call_plantuml(plantuml: str, lines: list[str]) -> tuple[bytes, bytes]:
     content = "\n".join(lines).encode("utf-8")
-    p = Popen(["plantuml", "-tpng", "-p"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    p = Popen([plantuml, "-tpng", "-p"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
     return p.communicate(input=content)
