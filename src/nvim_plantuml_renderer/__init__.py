@@ -1,7 +1,9 @@
 import argparse
 import shutil
+
 from .monitor import Monitor, MonitorConfig
 from subprocess import Popen, PIPE
+from .app import PlantUmlApp
 
 
 def _plantuml_is_ok(plantuml: str) -> bool:
@@ -53,5 +55,7 @@ def main():
 
     config = MonitorConfig(plantuml, connect_params, interval)
     monitor = Monitor(config)
+    monitor.connect()
 
-    monitor.monitor()
+    app = PlantUmlApp(monitor=monitor)
+    app.run()

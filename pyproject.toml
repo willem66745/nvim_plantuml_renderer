@@ -1,10 +1,10 @@
 [project]
 name = "nvim-plantuml-renderer"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Cheap temporary stupid live Plantuml renderer for Neovim"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["pynvim>=0.5.2", "textual-image>=0.7.0"]
+dependencies = ["pynvim>=0.5.2", "textual>=2.1.2", "textual-image>=0.7.0"]
 
 [project.scripts]
 nvim-plantuml-renderer = "nvim_plantuml_renderer:main"

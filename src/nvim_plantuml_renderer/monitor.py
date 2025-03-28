@@ -1,44 +1,12 @@
 from io import BytesIO
 import pynvim
 from pynvim.api import Window
-from time import sleep
-from datetime import datetime, timedelta
 from subprocess import Popen, PIPE
-from rich.console import Console, ConsoleRenderable
 from PIL.Image import open as pil_open
-from textual_image.renderable import Image as ConImage
+from PIL import Image as PILImage
 from typing import Literal
 
-type Render = tuple[Literal["error"], str] | tuple[Literal["image"], ConsoleRenderable]
-
-
-class RenderState:
-    def __init__(self):
-        self.status: str = "not rendered yet"
-        self.image: ConsoleRenderable | None = None
-
-    def handle_render(self, result: Render):
-        match result:
-            case ("error", error):
-                self.status = error
-            case ("image", image):
-                self.status = ""
-                self.image = image
-
-    def handle_no_render(self):
-        if self.image is None:
-            self.status = "not rendered yet"
-        else:
-            self.status = "outdated"
-
-    def render(self, con: Console):
-        con.clear()
-        if len(self.status) > 0:
-            con.print(self.status)
-        if self.image is not None:
-            con.print(self.image)
-
-
+type Render = tuple[Literal["error"], str] | tuple[Literal["image"], PILImage.Image]
 type ConnectParams = tuple[Literal["tcp"], str, int] | tuple[Literal["socket"], str]
 
 
@@ -90,9 +58,12 @@ class MonitorConfig:
 class Monitor:
     def __init__(self, config: MonitorConfig):
         self.config = config
-        self.state = RenderState()
 
-    def monitor(self):
+    @property
+    def interval(self):
+        return self.config.interval
+
+    def connect(self):
         match self.config.connect_params:
             case ("tcp", host, port):
                 nvim = pynvim.attach("tcp", address=host, port=port)
@@ -100,42 +71,21 @@ class Monitor:
                 nvim = pynvim.attach("socket", path=path)
 
         self.nvim = nvim
-        self._wait_poll_nvim()
+        # self._wait_poll_nvim()
 
-    def _wait_poll_nvim(self):
-        self.con = Console()
-        self.con.clear()
-        while True:
-            sleep_time = self._poll_nvim()
-            sleep(sleep_time)
-
-    def _poll_nvim(self) -> float:
+    def try_render(self) -> Render:
         name = self.nvim.current.window.buffer.name
 
-        before = datetime.now()
+        r: Render = ("error", "cursor not present at something that can be rendered")
 
-        r = None
-
-        if name.endswith(".plantuml"):
+        if name.endswith(".plantuml") or name.endswith(".puml"):
             r = self._render(self.nvim.current.window.buffer[:])
         elif name.endswith(".md"):
             content = isolate_plantuml(self.nvim.current.window)
             if content:
                 r = self._render(content)
 
-        if r is not None:
-            self.state.handle_render(r)
-        else:
-            self.state.handle_no_render()
-
-        self.state.render(self.con)
-
-        duration = datetime.now() - before
-
-        new_timeout = timedelta(seconds=self.config.interval) - duration
-        as_float = new_timeout.total_seconds()
-
-        return max(0.0, as_float)
+        return r
 
     def _render(self, lines: list[str]) -> Render:
         (out, err) = self._call_plantuml(lines)
@@ -143,8 +93,7 @@ class Monitor:
             return ("error", err.decode("utf-8"))
         elif len(out) > 0:
             pil = pil_open(BytesIO(out))
-            con = ConImage(pil)
-            return ("image", con)
+            return ("image", pil)
         else:
             return ("error", "plantuml didn't return anything")
 
