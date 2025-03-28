@@ -47,3 +47,5 @@ class PlantUmlApp(App[None]):
             case ("image", image):
                 self.query_one(PlantUmlImage).status = ""
                 self.query_one(PlantUmlImage).image = image
+            case ("no_change", _):
+                pass

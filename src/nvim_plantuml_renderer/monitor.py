@@ -6,7 +6,11 @@ from PIL.Image import open as pil_open
 from PIL import Image as PILImage
 from typing import Literal
 
-type Render = tuple[Literal["error"], str] | tuple[Literal["image"], PILImage.Image]
+type Render = (
+    tuple[Literal["error"], str]
+    | tuple[Literal["image"], PILImage.Image]
+    | tuple[Literal["no_change"], None]
+)
 type ConnectParams = tuple[Literal["tcp"], str, int] | tuple[Literal["socket"], str]
 
 
@@ -58,6 +62,7 @@ class MonitorConfig:
 class Monitor:
     def __init__(self, config: MonitorConfig):
         self.config = config
+        self.previous: list[str] = []
 
     @property
     def interval(self):
@@ -79,13 +84,20 @@ class Monitor:
         r: Render = ("error", "cursor not present at something that can be rendered")
 
         if name.endswith(".plantuml") or name.endswith(".puml"):
-            r = self._render(self.nvim.current.window.buffer[:])
+            r = self._try_render(self.nvim.current.window.buffer[:])
         elif name.endswith(".md"):
             content = isolate_plantuml(self.nvim.current.window)
             if content:
-                r = self._render(content)
+                r = self._try_render(content)
 
         return r
+
+    def _try_render(self, buf: list[str]) -> Render:
+        if buf != self.previous:
+            self.previous = buf
+            return self._render(buf)
+        else:
+            return ("no_change", None)
 
     def _render(self, lines: list[str]) -> Render:
         (out, err) = self._call_plantuml(lines)
