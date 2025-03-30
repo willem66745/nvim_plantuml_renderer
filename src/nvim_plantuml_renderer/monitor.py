@@ -57,6 +57,7 @@ class MonitorConfig:
         self.executable = executable
         self.connect_params = connect_params
         self.interval = interval
+        self.previous = []
 
 
 class Monitor:
@@ -76,7 +77,9 @@ class Monitor:
                 nvim = pynvim.attach("socket", path=path)
 
         self.nvim = nvim
-        # self._wait_poll_nvim()
+
+    def refresh(self):
+        self.previous = []
 
     def try_render(self) -> Render:
         name = self.nvim.current.window.buffer.name
