@@ -53,8 +53,12 @@ class SaveImageContainer(Container):
 
     def compose(self) -> ComposeResult:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        path = Path("~/Pictures/").expanduser()
+        if not path.is_dir() or not path.exists():
+            path = Path("~").expanduser()
+
         yield Input(f"plantuml_{timestamp}", validators=[Filename()])
-        yield OnlyDirectoryTree(Path("~/Pictures/").expanduser())
+        yield OnlyDirectoryTree(path)
 
 
 class SaveImageScreen(Screen[Path]):
